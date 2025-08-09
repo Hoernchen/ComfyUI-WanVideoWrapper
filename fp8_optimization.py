@@ -94,7 +94,7 @@ def convert_linear_with_lora_and_scale(module, scale_weight_keys=None, patches=N
 
             # Set LoRA if present
             if hasattr(submodule, "lora"):
-                print(f"removing old LoRA in {name}" )
+                #print(f"removing old LoRA in {name}" )
                 delattr(submodule, "lora")
             if patches is not None:
                 patch_key = f"diffusion_model.{name}.weight"
@@ -114,7 +114,7 @@ def convert_linear_with_lora_and_scale(module, scale_weight_keys=None, patches=N
                     lora_strengths = [p[0] for p in patch]
                     lora = (lora_diffs, lora_strengths)
                     setattr(submodule, "lora", lora)
-                    print(f"Added LoRA to {name} with {len(lora_diffs)} diffs and strengths {lora_strengths}")
+                    #print(f"Added LoRA to {name} with {len(lora_diffs)} diffs and strengths {lora_strengths}")
 
             # Set forward if Linear and has either scale or lora
             if isinstance(submodule, nn.Linear):
