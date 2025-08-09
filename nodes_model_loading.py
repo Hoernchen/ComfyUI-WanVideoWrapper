@@ -686,6 +686,10 @@ class WanVideoSetLoRAs:
             lora_sd = standardize_lora_key_format(lora_sd)
             if l["blocks"]:
                 lora_sd = filter_state_dict_by_blocks(lora_sd, l["blocks"], l.get("layer_filter", []))
+
+            # Filter out any LoRA keys containing 'img' if the base model state_dict has no 'img' keys
+            if not any('img' in k for k in model.model.diffusion_model.state_dict().keys()):
+                lora_sd = {k: v for k, v in lora_sd.items() if 'img' not in k}
             
             if "diffusion_model.patch_embedding.lora_A.weight" in lora_sd:
                 raise NotImplementedError("Control LoRA patching is not implemented in this node.")
@@ -1091,8 +1095,13 @@ class WanVideoModelLoader:
                     transformer = update_transformer(transformer, lora_sd)
 
                 lora_sd = standardize_lora_key_format(lora_sd)
+
                 if l["blocks"]:
                     lora_sd = filter_state_dict_by_blocks(lora_sd, l["blocks"], l.get("layer_filter", []))
+
+                # Filter out any LoRA keys containing 'img' if the base model state_dict has no 'img' keys
+                if not any('img' in k for k in sd.keys()):
+                    lora_sd = {k: v for k, v in lora_sd.items() if 'img' not in k}
 
                 #spacepxl's control LoRA patch
                 # for key in lora_sd.keys():
