@@ -1030,9 +1030,8 @@ class WanVideoModelLoader:
             model_type=comfy.model_base.ModelType.FLOW,
             device=device,
         )
-        
+        scale_weights = {}
         if not gguf:
-            scale_weights = {}
             if "fp8" in quantization:
                 for k, v in sd.items():
                     if k.endswith(".scale_weight"):
