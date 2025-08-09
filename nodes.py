@@ -8,7 +8,7 @@ import hashlib
 from diffusers.schedulers import FlowMatchEulerDiscreteScheduler
 
 from .wanvideo.modules.model import rope_params
-from .fp8_optimization import convert_linear_with_lora_and_scale, remove_lora_from_module
+from .fp8_optimization_v2 import remove_lora_from_module, set_lora_params as set_lora_params_fp8
 from .wanvideo.schedulers import get_scheduler, get_sampling_sigmas, retrieve_timesteps, scheduler_list
 from .gguf.gguf import set_lora_params
 from .multitalk.multitalk import timestep_transform, add_noise
@@ -1518,9 +1518,7 @@ class WanVideoSampler:
             log.info(f"Using {len(patcher.patches)} LoRA weight patches for WanVideo model")
             if not merge_loras and fp8_matmul:
                 raise NotImplementedError("FP8 matmul with unmerged LoRAs is not supported")
-            convert_linear_with_lora_and_scale(transformer, patches=patcher.patches, scale_weight_keys=scale_weights)
-        elif patch_linear:
-            convert_linear_with_lora_and_scale(transformer, scale_weight_keys=scale_weights)
+            set_lora_params_fp8(transformer, patcher.patches)
         else:
             remove_lora_from_module(transformer)
 

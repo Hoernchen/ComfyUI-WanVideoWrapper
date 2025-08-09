@@ -1036,7 +1036,10 @@ class WanVideoModelLoader:
                 for k, v in sd.items():
                     if k.endswith(".scale_weight"):
                         scale_weights[k] = v
-
+                if not merge_loras:
+                    from .fp8_optimization_v2 import _replace_linear
+                    transformer = _replace_linear(transformer, base_dtype, sd, scale_weights=scale_weights)
+                
             if "fp8_e4m3fn" in quantization:
                 dtype = torch.float8_e4m3fn
             elif "fp8_e5m2" in quantization:
@@ -1182,7 +1185,7 @@ class WanVideoModelLoader:
 
         patcher.model.is_patched = True
 
-        patch_linear = (True if "scaled" in quantization or not merge_loras else False)
+        patch_linear = (True if "scaled" in quantization or (lora is not None and not merge_loras) else False)
         
         if "fast" in quantization:
             if lora is not None and not merge_loras:
