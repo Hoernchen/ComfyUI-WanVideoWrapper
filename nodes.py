@@ -1499,19 +1499,28 @@ class WanVideoSampler:
         transformer = model.diffusion_model
 
         dtype = model["dtype"]
+        fp8_matmul = model["fp8_matmul"]
         gguf = model["gguf"]
+        scale_weights = model["scale_weights"]
         control_lora = model["control_lora"]
+
         transformer_options = patcher.model_options.get("transformer_options", None)
+        merge_loras = transformer_options["merge_loras"]
 
         is_5b = transformer.out_dim == 48
         vae_upscale_factor = 16 if is_5b else 8
 
-        if len(patcher.patches) != 0 and transformer_options.get("linear_with_lora", False) is True:
+        patch_linear = transformer_options.get("patch_linear", False)
+
+        if gguf:
+            set_lora_params(transformer, patcher.patches)
+        elif len(patcher.patches) != 0 and patch_linear:
             log.info(f"Using {len(patcher.patches)} LoRA weight patches for WanVideo model")
-            if not gguf:
-                convert_linear_with_lora_and_scale(transformer, patches=patcher.patches)
-            else:
-                set_lora_params(transformer, patcher.patches)
+            if not merge_loras and fp8_matmul:
+                raise NotImplementedError("FP8 matmul with unmerged LoRAs is not supported")
+            convert_linear_with_lora_and_scale(transformer, patches=patcher.patches, scale_weight_keys=scale_weights)
+        elif patch_linear:
+            convert_linear_with_lora_and_scale(transformer, scale_weight_keys=scale_weights)
         else:
             remove_lora_from_module(transformer)
 
