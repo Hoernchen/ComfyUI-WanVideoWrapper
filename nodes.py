@@ -3179,7 +3179,7 @@ class WanVideoSampler:
             "drop_last": drop_last,
             "generator_state": seed_g.get_state(),
         },{
-            "samples": callback_latent.unsqueeze(0).cpu(), 
+            "samples": callback_latent.unsqueeze(0).cpu() if callback is not None else None, 
         })
 
 #region VideoDecode
