@@ -7,11 +7,10 @@ from tqdm import tqdm
 from .wanvideo.modules.model import WanModel
 from .wanvideo.modules.t5 import T5EncoderModel
 from .wanvideo.modules.clip import CLIPModel
+from .wanvideo.wan_video_vae import WanVideoVAE, WanVideoVAE38
 
 from accelerate import init_empty_weights
 from .utils import set_module_tensor_to_device
-
-from .fp8_optimization import convert_linear_with_lora_and_scale
 
 import folder_paths
 import comfy.model_management as mm
@@ -1318,8 +1317,6 @@ class WanVideoVAELoader:
     DESCRIPTION = "Loads Wan VAE model from 'ComfyUI/models/vae'"
 
     def loadmodel(self, model_name, precision, compile_args=None):
-        from .wanvideo.wan_video_vae import WanVideoVAE, WanVideoVAE38
-
         dtype = {"bf16": torch.bfloat16, "fp16": torch.float16, "fp32": torch.float32}[precision]
         #with open(os.path.join(script_directory, 'configs', 'hy_vae_config.json')) as f:
         #    vae_config = json.load(f)
