@@ -97,8 +97,9 @@ def convert_linear_with_lora_and_scale(module, scale_weight_keys=None, patches=N
                 #print(f"removing old LoRA in {name}" )
                 delattr(submodule, "lora")
             if patches is not None:
-                patch_key = f"diffusion_model.{name}.weight"
-                patch = patches.get(patch_key, [])
+                patch_key1 = f"diffusion_model.{name}.weight"
+                patch_key_compiled = f"diffusion_model.{name.replace('_orig_mod.', '')}.weight"
+                patch = patches.get(patch_key1, []) or patches.get(patch_key_compiled, [])
                 if len(patch) != 0:
                     lora_diffs = []
                     for p in patch:
