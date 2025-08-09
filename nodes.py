@@ -1931,10 +1931,11 @@ class WanVideoSampler:
             all_indices = []
             for entry in extra_latents:
                 add_index = entry["index"]
-                noise[:, add_index] = entry["samples"].squeeze(0).squeeze(1).to(noise)
-                log.info(f"Adding extra samples to latent index {add_index}")
-                all_indices.append(add_index)
-        
+                num_extra_frames = entry["samples"].shape[2]
+                noise[:, add_index:add_index+num_extra_frames] = entry["samples"].to(noise)
+                log.info(f"Adding extra samples to latent indices {add_index} to {add_index+num_extra_frames-1}")
+                all_indices.extend(range(add_index, add_index+num_extra_frames))
+
 
         latent = noise.to(device)
 
