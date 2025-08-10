@@ -129,7 +129,7 @@ def get_tensor_memory(tensor):
 def patch_weight_to_device(self, key, device_to=None, inplace_update=False, backup_keys=False, scale_weight=None):
     if key not in self.patches:
         return
-    
+
     weight, set_func, convert_func = get_key_weight(self.model, key)
     inplace_update = self.weight_inplace_update or inplace_update
 
@@ -147,7 +147,7 @@ def patch_weight_to_device(self, key, device_to=None, inplace_update=False, back
         temp_weight = temp_weight * scale_weight.to(temp_weight.device, temp_weight.dtype)
 
     out_weight = calculate_weight(self.patches[key], temp_weight, key)
-    
+
     if set_func is None:
         out_weight = stochastic_rounding(out_weight, weight.dtype, seed=string_to_seed(key))
         if inplace_update:
@@ -208,7 +208,7 @@ def apply_lora(model, device_to, transformer_load_device, params_to_keep=None, d
                         continue
             m.comfy_patched_weights = True
             pbar.update(1)
-      
+
         model.current_weight_patches_uuid = model.patches_uuid
         if low_mem_load:
             for name, param in model.model.diffusion_model.named_parameters():
@@ -230,11 +230,11 @@ def split_tiles(embeds, num_split):
     for x in embeds:
         x = x.unsqueeze(0)
         h, w = H // num_split, W // num_split
-        x_split = torch.cat([x[:, i*h:(i+1)*h, j*w:(j+1)*w, :] for i in range(num_split) for j in range(num_split)], dim=0)    
+        x_split = torch.cat([x[:, i*h:(i+1)*h, j*w:(j+1)*w, :] for i in range(num_split) for j in range(num_split)], dim=0)
         out.append(x_split)
-    
+
     x_split = torch.stack(out, dim=0)
-    
+
     return x_split
 
 def merge_hiddenstates(x, tiles):
@@ -254,19 +254,19 @@ def merge_hiddenstates(x, tiles):
         patch_embeds = embeds[:, 1:, :]  # Shape: [num_tiles, tile_size^2, embeds[-1]]
         reshaped = patch_embeds.reshape(grid_size, grid_size, tile_size, tile_size, embeds.shape[-1])
 
-        merged = torch.cat([torch.cat([reshaped[i, j] for j in range(grid_size)], dim=1) 
+        merged = torch.cat([torch.cat([reshaped[i, j] for j in range(grid_size)], dim=1)
                             for i in range(grid_size)], dim=0)
-        
+
         merged = merged.unsqueeze(0)  # Shape: [1, grid_size*tile_size, grid_size*tile_size, embeds[-1]]
-        
+
         # Pool to original size
         pooled = torch.nn.functional.adaptive_avg_pool2d(merged.permute(0, 3, 1, 2), (tile_size, tile_size)).permute(0, 2, 3, 1)
         flattened = pooled.reshape(1, tile_size*tile_size, embeds.shape[-1])
-        
+
         # Add back the class token
         with_class = torch.cat([avg_class_token, flattened], dim=1)  # Shape: original shape
         out.append(with_class)
-    
+
     out = torch.cat(out, dim=0)
 
     return out
@@ -367,7 +367,7 @@ def is_image_black(image, threshold=1e-3):
     return torch.all(image < threshold).item()
 
 def add_noise_to_reference_video(image, ratio=None):
-    sigma = torch.ones((image.shape[0],)).to(image.device, image.dtype) * ratio 
+    sigma = torch.ones((image.shape[0],)).to(image.device, image.dtype) * ratio
     image_noise = torch.randn_like(image) * sigma[:, None, None, None]
     image_noise = torch.where(image==-1, torch.zeros_like(image), image_noise)
     image = image + image_noise
@@ -383,7 +383,7 @@ def optimized_scale(positive_flat, negative_flat):
 
     # st_star = v_cond^T * v_uncond / ||v_uncond||^2
     st_star = dot_product / squared_norm
-    
+
     return st_star
 
 def find_closest_valid_dim(fixed_dim, var_dim, block_size):
@@ -451,7 +451,7 @@ def setup_radial_attention(transformer, transformer_options, latent, seq_len, la
             block.dense_attention_mode = dense_attention_mode
             block.dense_timesteps = dense_timesteps
             block.self_attn.decay_factor = decay_factor
-                    
+
     log.info(f"Radial attention mode enabled.")
     log.info(f"dense_attention_mode: {dense_attention_mode}, dense_timesteps: {dense_timesteps}, decay_factor: {decay_factor}")
     log.info(f"dense_blocks: {[i for i, block in enumerate(transformer.blocks) if getattr(block, 'dense_block', False)]})")
@@ -523,3 +523,97 @@ def get_raag_guidance(noise_pred_cond, noise_pred_uncond, w_max, alpha=1.0, eps=
     ratio_mean = ratio.mean().item()
     adaptive_w = 1.0 + (w_max - 1.0) * math.exp(-alpha * ratio_mean)
     return adaptive_w
+
+# Dynamic input support classes (similar to rgthree)
+class AnyType(str):
+    """A special class that is always equal in not equal comparisons. Credit to pythongosssss"""
+    def __ne__(self, __value: object) -> bool:
+        return False
+
+any_type = AnyType("*")
+
+class FlexibleOptionalInputType(dict):
+    """A special class to make flexible nodes that pass data to our python handlers.
+
+    Enables both flexible/dynamic input types or a dynamic number of inputs.
+    This allows nodes to accept any number of inputs that are added/removed dynamically.
+    """
+    def __init__(self, type_spec, prefix="", data=None):
+        self.type = type_spec
+        self.prefix = prefix
+        self.data = data if data is not None else {}
+        if self.data:
+            for k, v in self.data.items():
+                self[k] = v
+
+    def __getitem__(self, key):
+        # If we have this key in the initial data, return it.
+        # Otherwise return the tuple with our flexible type for dynamic inputs
+        if self.data and key in self.data:
+            return self.data[key]
+        # For prompt inputs, return STRING type with multiline support
+        if self.prefix and key.startswith(self.prefix):
+            if "positive" in key:
+                return ("STRING", {"default": "", "multiline": True, "tooltip": f"Positive prompt for iteration"})
+            elif "negative" in key:
+                return ("STRING", {"default": "", "multiline": True, "tooltip": f"Negative prompt for iteration"})
+        return (self.type,)
+
+    def __contains__(self, key):
+        """Always contain a key for dynamic inputs."""
+        return True
+
+def is_none(value):
+    """Check if a value is None or empty."""
+    if value is None:
+        return True
+    if isinstance(value, (str, list, dict)) and len(value) == 0:
+        return True
+    return False
+
+# Dynamic input support classes (similar to rgthree)
+class AnyType(str):
+    """A special class that is always equal in not equal comparisons. Credit to pythongosssss"""
+    def __ne__(self, __value: object) -> bool:
+        return False
+
+any_type = AnyType("*")
+
+class FlexibleOptionalInputType(dict):
+    """A special class to make flexible nodes that pass data to our python handlers.
+
+    Enables both flexible/dynamic input types or a dynamic number of inputs.
+    This allows nodes to accept any number of inputs that are added/removed dynamically.
+    """
+    def __init__(self, type_spec, prefix="", data=None):
+        self.type = type_spec
+        self.prefix = prefix
+        self.data = data if data is not None else {}
+        if self.data:
+            for k, v in self.data.items():
+                self[k] = v
+
+    def __getitem__(self, key):
+        # If we have this key in the initial data, return it.
+        # Otherwise return the tuple with our flexible type for dynamic inputs
+        if self.data and key in self.data:
+            return self.data[key]
+        # For prompt inputs, return STRING type with multiline support
+        if self.prefix and key.startswith(self.prefix):
+            if "positive" in key:
+                return ("STRING", {"default": "", "multiline": True, "tooltip": f"Positive prompt for iteration"})
+            elif "negative" in key:
+                return ("STRING", {"default": "", "multiline": True, "tooltip": f"Negative prompt for iteration"})
+        return (self.type,)
+
+    def __contains__(self, key):
+        """Always contain a key for dynamic inputs."""
+        return True
+
+def is_none(value):
+    """Check if a value is None or empty."""
+    if value is None:
+        return True
+    if isinstance(value, (str, list, dict)) and len(value) == 0:
+        return True
+    return False
