@@ -694,13 +694,23 @@ class FlowDPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
                    (alpha_t * (torch.exp(-h) - 1.0)) * D0 +
                    (alpha_t * ((torch.exp(-h) - 1.0) / h + 1.0)) * D1 -
                    (alpha_t * ((torch.exp(-h) - 1.0 + h) / h**2 - 0.5)) * D2)
+            return x_t  # pyright: ignore
         elif self.config.algorithm_type == "dpmsolver":
             # See https://arxiv.org/abs/2206.00927 for detailed derivations
             x_t = ((alpha_t / alpha_s0) * sample - (sigma_t *
                                                     (torch.exp(h) - 1.0)) * D0 -
                    (sigma_t * ((torch.exp(h) - 1.0) / h - 1.0)) * D1 -
                    (sigma_t * ((torch.exp(h) - 1.0 - h) / h**2 - 0.5)) * D2)
-        return x_t  # pyright: ignore
+            return x_t  # pyright: ignore
+        elif self.config.algorithm_type in ["sde-dpmsolver++", "sde-dpmsolver"]:
+            # For SDE variants, fall back to second-order update
+            # Third-order SDE update is not implemented in the original paper
+            raise NotImplementedError(
+                f"Third-order update not implemented for {self.config.algorithm_type}. "
+                "Please use solver_order=2 or lower for SDE variants."
+            )
+        else:
+            raise ValueError(f"Unknown algorithm type: {self.config.algorithm_type}")
 
     def index_for_timestep(self, timestep, schedule_timesteps=None):
         if schedule_timesteps is None:
